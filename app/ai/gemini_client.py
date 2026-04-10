@@ -11,7 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
-    """Клиент Gemini API с безопасным fallback."""
+    """
+    Стабильный клиент Gemini.
+
+    Что важно:
+    - Для image modes НЕ ходит в Gemini вообще.
+    - Для avatar/poster/stickers/product всегда сразу использует локальный fallback.
+    - В Gemini ходит только для текстовых задач:
+      improve_prompt, classify_request, generate_helper_reply.
+    """
+
+    IMAGE_MODES = {"avatar", "poster", "stickers", "product"}
 
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -147,6 +157,52 @@ remove_bg, avatar, poster, stickers, product, help
             return "product"
         return "help"
 
+    def _build_local_image_prompt(
+        self,
+        mode: str,
+        user_text: str = "",
+        style_key: str | None = None,
+    ) -> str:
+        """
+        Локальный builder для image modes.
+        Здесь нет внешних API-вызовов вообще.
+        """
+        style_part = f" Стиль: {style_key}." if style_key else ""
+        user_part = f" Пожелание пользователя: {user_text}." if user_text else ""
+
+        if mode == "avatar":
+            return (
+                f"Сделай стильный портрет по загруженному фото.{style_part}{user_part} "
+                f"Естественная ретушь, акцент на лице, красивый свет, аккуратная детализация кожи, "
+                f"современная премиальная визуальная подача, выразительный взгляд, чистая композиция."
+            )
+
+        if mode == "poster":
+            return (
+                f"Сделай кинематографичный постер по загруженному фото.{style_part}{user_part} "
+                f"Драматичный свет, сильная композиция, постерная подача, выразительная атмосфера, "
+                f"глубина, контраст, эффектный визуальный стиль, рекламный уровень качества."
+            )
+
+        if mode == "stickers":
+            return (
+                f"Сделай набор стикеров по загруженному фото.{style_part}{user_part} "
+                f"Чистые контуры, выразительные эмоции, яркая стикерная стилизация, "
+                f"читаемый персонаж, аккуратная изоляция, простой фон или прозрачная подача."
+            )
+
+        if mode == "product":
+            return (
+                f"Сделай коммерческое товарное фото по загруженному изображению.{style_part}{user_part} "
+                f"Студийный свет, чистая композиция, premium look, рекламная подача, "
+                f"аккуратные материалы, подчёркнутый объём, чистый фон, продающий визуал."
+            )
+
+        return (
+            f"Обработай изображение по фото.{style_part}{user_part} "
+            f"Качественный результат, чистая композиция, аккуратная визуальная подача."
+        )
+
     async def build_hidden_image_prompt(
         self,
         mode: str,
@@ -154,68 +210,21 @@ remove_bg, avatar, poster, stickers, product, help
         style_key: str | None = None,
     ) -> str:
         """
-        Строит скрытый prompt для image provider.
-        style_key оставлен для совместимости со старым кодом.
+        Для image modes Gemini не используется вообще.
+        Сразу возвращается локально собранный hidden prompt.
         """
-
-        style_hint = f"\nСтиль: {style_key}" if style_key else ""
-
-        prompt = f"""
-Ты — внутренний AI-оркестратор Telegram-бота по обработке фото.
-Нужно составить один качественный скрытый prompt для image-to-image обработки.
-
-Режим: {mode}{style_hint}
-Пожелание пользователя: {user_text or "без дополнительных пожеланий"}
-
-Верни только готовый prompt без пояснений.
-
-Требования по режимам:
-- avatar: сильный портрет, красивый свет, аккуратная ретушь, акцент на лице
-- poster: кинематографичность, драматичный свет, выразительная композиция
-- stickers: стикерный стиль, чистые контуры, читаемые эмоции, серия стикеров
-- product: коммерческий вид, чистая подача, студийный свет, premium look
-""".strip()
-
-        try:
-            return await self._generate_text(prompt)
-        except Exception as exc:
-            logger.warning(
-                "Gemini build_hidden_image_prompt fallback: mode=%s style=%s error=%s",
-                mode,
-                style_key,
-                exc,
+        if mode in self.IMAGE_MODES:
+            return self._build_local_image_prompt(
+                mode=mode,
+                user_text=user_text,
+                style_key=style_key,
             )
 
-            style_part = f" Стиль: {style_key}." if style_key else ""
-
-            fallback_map = {
-                "avatar": (
-                    f"Сделай стильный портрет по загруженному фото.{style_part} "
-                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
-                    f"Естественная ретушь, акцент на лице, качественный свет, современный премиальный стиль."
-                ),
-                "poster": (
-                    f"Сделай кинематографичный постер по загруженному фото.{style_part} "
-                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
-                    f"Драматичный свет, сильная композиция, выразительная атмосфера, эффектный визуальный стиль."
-                ),
-                "stickers": (
-                    f"Сделай набор стикеров по загруженному фото.{style_part} "
-                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
-                    f"Чистые контуры, яркие эмоции, стикерный стиль, аккуратная изоляция персонажа."
-                ),
-                "product": (
-                    f"Сделай коммерческое товарное фото по загруженному изображению.{style_part} "
-                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
-                    f"Чистый фон, студийный свет, аккуратные материалы, рекламный premium look."
-                ),
-            }
-            return fallback_map.get(
-                mode,
-                f"Обработай изображение по фото.{style_part} "
-                f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
-                f"Качественный результат, чистая композиция, аккуратная визуальная подача.",
-            )
+        return self._build_local_image_prompt(
+            mode=mode,
+            user_text=user_text,
+            style_key=style_key,
+        )
 
     async def generate_helper_reply(self, mode: str, text: str) -> str:
         prompt = f"""
