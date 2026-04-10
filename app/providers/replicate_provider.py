@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import aiofiles
 import aiohttp
 import replicate
 
+from app.config import get_settings
 from app.providers.base import BaseImageProvider, ImageJobRequest
 
 
@@ -14,10 +14,9 @@ class ReplicateImageProvider(BaseImageProvider):
     provider_name = "replicate"
 
     def __init__(self) -> None:
-        self.model_ref = os.getenv(
-            "REPLICATE_MODEL_REF",
-            "black-forest-labs/flux-kontext-max",
-        )
+        settings = get_settings()
+        self.model_ref = settings.replicate_model_ref
+        self.replicate_token = settings.replicate_api_token.strip()
 
     async def _download_output(self, output, output_path: Path) -> str:
         url = None
@@ -47,6 +46,9 @@ class ReplicateImageProvider(BaseImageProvider):
         return str(output_path)
 
     async def run(self, job: ImageJobRequest) -> str:
+        if not self.replicate_token:
+            raise RuntimeError("REPLICATE_API_TOKEN не задан в переменных окружения")
+
         input_path = Path(job.input_path)
         output_dir = Path("./data/media/output")
         output_dir.mkdir(parents=True, exist_ok=True)
