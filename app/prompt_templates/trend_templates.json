@@ -1,0 +1,107 @@
+[
+  {
+    "key": "movie_poster",
+    "title": "Кино-постер",
+    "category": "poster",
+    "prompt_text": "Create a cinematic movie poster based on the uploaded subject. Dramatic lighting, premium composition, bold title placement, high visual impact.",
+    "is_active": true
+  },
+  {
+    "key": "action_figure",
+    "title": "Action Figure Box",
+    "category": "product",
+    "prompt_text": "Turn the subject into a premium action figure package shot. Collectible toy box, accessories layout, retail-ready lighting, ultra detailed packaging design.",
+    "is_active": true
+  },
+  {
+    "key": "luxury_product_shot",
+    "title": "Luxury Product Shot",
+    "category": "product",
+    "prompt_text": "Create a luxury commercial product shot. Soft studio light, premium materials, elegant reflections, clean background, ad-ready composition.",
+    "is_active": true
+  },
+  {
+    "key": "anime_makeover",
+    "title": "Anime Makeover",
+    "category": "portrait",
+    "prompt_text": "Transform the subject into a polished anime-style character. Expressive eyes, clean linework, vibrant colors, high-end anime poster finish.",
+    "is_active": true
+  },
+  {
+    "key": "sticker_pack",
+    "title": "Sticker Pack",
+    "category": "social",
+    "prompt_text": "Create a cohesive sticker pack from the subject. Multiple expressions, bold outlines, transparent background, clean die-cut sticker style.",
+    "is_active": true
+  },
+  {
+    "key": "transparent_background",
+    "title": "Transparent Background Prompt",
+    "category": "utility",
+    "prompt_text": "Prepare the subject for transparent background output. Isolated object, clean edges, centered composition, high separation from background.",
+    "is_active": true
+  },
+  {
+    "key": "profile_avatar",
+    "title": "Profile Avatar",
+    "category": "portrait",
+    "prompt_text": "Generate a clean premium profile avatar. Strong face focus, flattering light, modern color grading, social-profile-ready result.",
+    "is_active": true
+  },
+  {
+    "key": "fashion_editorial",
+    "title": "Fashion Editorial",
+    "category": "fashion",
+    "prompt_text": "Create a high-fashion editorial image. Magazine quality styling, controlled studio lighting, luxury aesthetic, bold visual storytelling.",
+    "is_active": true
+  },
+  {
+    "key": "youtube_thumbnail",
+    "title": "YouTube Thumbnail Concept",
+    "category": "social",
+    "prompt_text": "Design a high-CTR YouTube thumbnail concept. Strong focal subject, emotional expression, bold negative space for text, vibrant contrast.",
+    "is_active": true
+  },
+  {
+    "key": "instagram_ad",
+    "title": "Instagram Ad Creative",
+    "category": "social",
+    "prompt_text": "Create a scroll-stopping Instagram ad concept. Modern brand styling, clean hierarchy, premium lighting, conversion-oriented visual clarity.",
+    "is_active": true
+  },
+  {
+    "key": "old_money_portrait",
+    "title": "Old Money Portrait",
+    "category": "portrait",
+    "prompt_text": "Create an old money portrait aesthetic. Quiet luxury, refined wardrobe, natural confidence, soft daylight, understated premium styling.",
+    "is_active": true
+  },
+  {
+    "key": "cyberpunk_portrait",
+    "title": "Cyberpunk Portrait",
+    "category": "portrait",
+    "prompt_text": "Transform the subject into a cyberpunk portrait. Neon atmosphere, futuristic fashion, moody shadows, cinematic sci-fi composition.",
+    "is_active": true
+  },
+  {
+    "key": "passport_id_photo",
+    "title": "Passport / ID Photo Prompt",
+    "category": "utility",
+    "prompt_text": "Generate a neutral passport-style portrait prompt. Straight posture, plain clean background, natural color, clear facial visibility, official-photo look.",
+    "is_active": true
+  },
+  {
+    "key": "meme_scene",
+    "title": "Meme Scene Prompt",
+    "category": "social",
+    "prompt_text": "Create a meme-ready visual scene based on the subject. Exaggerated storytelling, readable expression, simple background, viral shareability.",
+    "is_active": true
+  },
+  {
+    "key": "brand_poster",
+    "title": "Brand Poster Prompt",
+    "category": "poster",
+    "prompt_text": "Create a premium brand poster. Strong hero composition, clean typography zone, commercial polish, premium campaign visual language.",
+    "is_active": true
+  }
+]

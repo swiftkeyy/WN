@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  bot:
+    build: .
+    container_name: ai-photo-telegram-bot
+    env_file:
+      - .env
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
