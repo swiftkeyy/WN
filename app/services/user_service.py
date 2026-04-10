@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from aiogram.types import User as TgUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,22 +8,32 @@ from app.database.models import User
 
 
 class UserService:
-    """User management service."""
+    async def get_or_create_user(
+        self,
+        session: AsyncSession,
+        telegram_user: TgUser | None,
+    ) -> User:
+        if telegram_user is None:
+            raise ValueError("telegram_user is required")
 
-    async def get_or_create_user(self, session: AsyncSession, tg_user: TgUser) -> User:
-        user = await crud.get_user_by_telegram_id(session, tg_user.id)
-        if user is None:
+        existing = await crud.get_user_by_telegram_id(session, telegram_user.id)
+
+        if existing is None:
             return await crud.create_user(
-                session,
-                telegram_id=tg_user.id,
-                username=tg_user.username,
-                first_name=tg_user.first_name,
-                language_code=tg_user.language_code,
+                session=session,
+                telegram_id=telegram_user.id,
+                username=telegram_user.username,
+                first_name=telegram_user.first_name,
+                language_code=telegram_user.language_code,
             )
-        return await crud.update_user_profile(
-            session,
-            user,
-            username=tg_user.username,
-            first_name=tg_user.first_name,
-            language_code=tg_user.language_code,
+
+        updated = await crud.update_user_profile(
+            session=session,
+            user_id=existing.id,
+            username=telegram_user.username,
+            first_name=telegram_user.first_name,
+            language_code=telegram_user.language_code,
         )
+        if updated is None:
+            raise RuntimeError("failed to update existing user")
+        return updated
