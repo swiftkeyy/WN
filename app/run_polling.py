@@ -4,18 +4,34 @@ import logging
 from aiogram.exceptions import TelegramUnauthorizedError
 
 from app.bot import create_bot, create_dispatcher, delete_webhook, set_bot_commands
+from app.config import get_settings
 from app.database.session import AsyncSessionLocal
 from app.services.template_service import TemplateService
 from app.utils.files import ensure_media_dirs
 from app.utils.logging import setup_logging
 
-logger = logging.getLogger(__name__)
+settings = get_settings()
 template_service = TemplateService()
+logger = logging.getLogger(__name__)
+
+
+def mask(value: str) -> str:
+    if not value:
+        return "EMPTY"
+    if len(value) <= 8:
+        return "***"
+    return value[:4] + "***" + value[-4:]
 
 
 async def main() -> None:
     setup_logging()
     ensure_media_dirs()
+
+    logger.info("CONFIG DEBUG:")
+    logger.info("ADMIN_TELEGRAM_IDS=%r", settings.admin_telegram_ids)
+    logger.info("IMAGE_PROVIDER=%r", settings.image_provider)
+    logger.info("REPLICATE_API_TOKEN=%s", mask(settings.replicate_api_token))
+    logger.info("FAL_KEY=%s", mask(settings.fal_key))
 
     async with AsyncSessionLocal() as session:
         await template_service.seed_from_file(session)
@@ -25,19 +41,24 @@ async def main() -> None:
 
     try:
         try:
-            await delete_webhook(bot)
             await set_bot_commands(bot)
         except TelegramUnauthorizedError:
-            logger.error('Неверный TELEGRAM_BOT_TOKEN')
+            logger.error("Invalid TELEGRAM_BOT_TOKEN")
             return
-        except Exception as exc:  # noqa: BLE001
-            logger.warning('Пропускаю часть Telegram init: %s', exc)
+        except Exception as exc:
+            logger.warning("set_my_commands skipped: %s", exc)
 
-        logger.info('Бот запущен в режиме polling')
+        try:
+            await delete_webhook(bot)
+        except Exception as exc:
+            logger.warning("delete_webhook skipped: %s", exc)
+
+        logger.info("Bot started in polling mode")
         await dp.start_polling(bot, skip_updates=True)
+
     finally:
         await bot.session.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
