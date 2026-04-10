@@ -45,7 +45,27 @@ class Settings(BaseSettings):
 
     max_history_items: int = 10
     template_seed_path: Path = Path('./app/prompt_templates/trend_templates.json')
+
     image_provider: str = 'none'
+    image_provider_chain: str = 'replicate,fal'
+    image_provider_primary_by_mode: str = 'stickers:fal'
+
+    openai_api_key: str = ''
+    openai_image_model: str = 'gpt-image-1.5'
+    openai_image_quality: str = 'high'
+    openai_image_size: str = '1024x1024'
+    openai_timeout_seconds: int = 180
+
+    replicate_api_key: str = ''
+    replicate_model_owner: str = 'black-forest-labs'
+    replicate_model_name: str = 'flux-kontext-max'
+    replicate_timeout_seconds: int = 240
+    replicate_wait_seconds: int = 120
+
+    fal_api_key: str = ''
+    fal_model_id: str = 'fal-ai/nano-banana-2/edit'
+    fal_timeout_seconds: int = 240
+    fal_poll_interval_seconds: int = 2
 
     @property
     def webhook_path(self) -> str:

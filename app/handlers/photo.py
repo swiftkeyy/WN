@@ -64,7 +64,7 @@ async def handle_mode_photo(message: Message, state: FSMContext) -> None:
         )
 
         try:
-            output_path = await workflow_service.process(
+            output_path, provider_name = await workflow_service.process(
                 mode=mode,
                 input_path=input_path,
                 user_text=user_text,
@@ -75,12 +75,13 @@ async def handle_mode_photo(message: Message, state: FSMContext) -> None:
                 task.id,
                 status=TaskStatuses.DONE,
                 output_file_path=output_path,
+                provider=provider_name,
             )
             await history_service.log(
                 session,
                 user_id=user.id,
                 action_type=HistoryActions.IMAGE_TASK_DONE,
-                payload_json={'mode': mode, 'style_key': style_key, 'output_path': output_path},
+                payload_json={'mode': mode, 'style_key': style_key, 'output_path': output_path, 'provider': provider_name},
             )
         except Exception as exc:  # noqa: BLE001
             await crud.update_task_status(
@@ -114,7 +115,7 @@ async def handle_mode_photo(message: Message, state: FSMContext) -> None:
     else:
         await message.answer_photo(
             tg_file,
-            caption=f'Готово. Режим: {MODE_TITLES.get(mode, mode)}.',
+            caption=f'Готово. Режим: {MODE_TITLES.get(mode, mode)}. Провайдер: {provider_name}.',
         )
 
     await status_message.delete()
