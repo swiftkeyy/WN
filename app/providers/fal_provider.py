@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import aiofiles
 import aiohttp
 import fal_client
 
+from app.config import get_settings
 from app.providers.base import BaseImageProvider, ImageJobRequest
 
 
@@ -14,8 +14,9 @@ class FalImageProvider(BaseImageProvider):
     provider_name = "fal"
 
     def __init__(self) -> None:
-        self.model_ref = os.getenv("FAL_MODEL_REF", "fal-ai/nano-banana/edit")
-        self.fal_key = os.getenv("FAL_KEY", "").strip()
+        settings = get_settings()
+        self.model_ref = settings.fal_model_ref
+        self.fal_key = settings.fal_key.strip()
 
     async def _download_output(self, url: str, output_path: Path) -> str:
         async with aiohttp.ClientSession() as session:
