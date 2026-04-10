@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
-    """Клиент Gemini API с header-auth, fallback и безопасным логированием."""
+    """Клиент Gemini API с безопасным fallback."""
 
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -80,7 +80,6 @@ class GeminiClient:
         return text
 
     async def improve_prompt(self, text: str) -> dict[str, str]:
-        """Улучшение пользовательского запроса. Безопасный fallback."""
         prompt = f"""
 Ты AI-ассистент для генерации и обработки изображений.
 Верни JSON со строго такими ключами:
@@ -117,7 +116,6 @@ short_version, detailed_version, trend_version, detected_goal
             }
 
     async def classify_request(self, text: str) -> str:
-        """Классификация пользовательского запроса. Безопасный fallback."""
         prompt = f"""
 Классифицируй запрос пользователя строго в один из вариантов:
 remove_bg, avatar, poster, stickers, product, help
@@ -152,19 +150,22 @@ remove_bg, avatar, poster, stickers, product, help
     async def build_hidden_image_prompt(
         self,
         mode: str,
-        user_text: str,
+        user_text: str = "",
+        style_key: str | None = None,
     ) -> str:
         """
-        Строит скрытый внутренний prompt для image provider.
-        Пользователю его не показываем.
+        Строит скрытый prompt для image provider.
+        style_key оставлен для совместимости со старым кодом.
         """
+
+        style_hint = f"\nСтиль: {style_key}" if style_key else ""
 
         prompt = f"""
 Ты — внутренний AI-оркестратор Telegram-бота по обработке фото.
 Нужно составить один качественный скрытый prompt для image-to-image обработки.
 
-Режим: {mode}
-Пожелание пользователя: {user_text}
+Режим: {mode}{style_hint}
+Пожелание пользователя: {user_text or "без дополнительных пожеланий"}
 
 Верни только готовый prompt без пояснений.
 
@@ -178,36 +179,45 @@ remove_bg, avatar, poster, stickers, product, help
         try:
             return await self._generate_text(prompt)
         except Exception as exc:
-            logger.warning("Gemini build_hidden_image_prompt fallback: mode=%s error=%s", mode, exc)
+            logger.warning(
+                "Gemini build_hidden_image_prompt fallback: mode=%s style=%s error=%s",
+                mode,
+                style_key,
+                exc,
+            )
+
+            style_part = f" Стиль: {style_key}." if style_key else ""
+
             fallback_map = {
                 "avatar": (
-                    f"Сделай стильный портрет по загруженному фото. "
-                    f"Пожелание пользователя: {user_text}. "
+                    f"Сделай стильный портрет по загруженному фото.{style_part} "
+                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
                     f"Естественная ретушь, акцент на лице, качественный свет, современный премиальный стиль."
                 ),
                 "poster": (
-                    f"Сделай кинематографичный постер по загруженному фото. "
-                    f"Пожелание пользователя: {user_text}. "
+                    f"Сделай кинематографичный постер по загруженному фото.{style_part} "
+                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
                     f"Драматичный свет, сильная композиция, выразительная атмосфера, эффектный визуальный стиль."
                 ),
                 "stickers": (
-                    f"Сделай набор стикеров по загруженному фото. "
-                    f"Пожелание пользователя: {user_text}. "
+                    f"Сделай набор стикеров по загруженному фото.{style_part} "
+                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
                     f"Чистые контуры, яркие эмоции, стикерный стиль, аккуратная изоляция персонажа."
                 ),
                 "product": (
-                    f"Сделай коммерческое товарное фото по загруженному изображению. "
-                    f"Пожелание пользователя: {user_text}. "
+                    f"Сделай коммерческое товарное фото по загруженному изображению.{style_part} "
+                    f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
                     f"Чистый фон, студийный свет, аккуратные материалы, рекламный premium look."
                 ),
             }
             return fallback_map.get(
                 mode,
-                f"Обработай изображение по фото. Пожелание пользователя: {user_text}. Качественный результат, чистая композиция, аккуратная визуальная подача.",
+                f"Обработай изображение по фото.{style_part} "
+                f"Пожелание пользователя: {user_text or 'без дополнительных пожеланий'}. "
+                f"Качественный результат, чистая композиция, аккуратная визуальная подача.",
             )
 
     async def generate_helper_reply(self, mode: str, text: str) -> str:
-        """Короткий русский ответ для help/onboarding. С fallback."""
         prompt = f"""
 Ты помощник внутри Telegram-бота по обработке фото.
 Режим: {mode}
