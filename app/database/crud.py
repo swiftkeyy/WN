@@ -76,19 +76,12 @@ async def create_task(
 
 
 async def update_task_status(
-    session: AsyncSession,
+    session,
     task_id: int,
-    *,
     status: str,
     output_file_path: str | None = None,
     error_message: str | None = None,
-) -> None:
-    await session.execute(
-        update(Task)
-        .where(Task.id == task_id)
-        .values(status=status, output_file_path=output_file_path, error_message=error_message)
-    )
-    await session.commit()
+):
 
 
 async def create_history_entry(
