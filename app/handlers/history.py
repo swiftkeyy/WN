@@ -17,11 +17,6 @@ def _format_history_item(action_type: str, created_at, payload_json) -> str:
     return f"• {created} — {action_type}{payload}"
 
 
-@router.message(F.text == "История")
-async def history_message_compat(message: Message) -> None:
-    await show_history_message(message)
-
-
 @router.callback_query(F.data == "menu:history")
 async def history_callback(callback: CallbackQuery) -> None:
     if not callback.message or not callback.from_user:
@@ -53,7 +48,8 @@ async def history_callback(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-async def show_history_message(message: Message) -> None:
+@router.message(F.text == "История")
+async def history_message_compat(message: Message) -> None:
     async with AsyncSessionLocal() as session:
         user = await user_service.get_or_create_user(session, message.from_user)
         items = await history_service.get_recent(session, user.id)
