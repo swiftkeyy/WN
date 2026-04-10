@@ -12,13 +12,17 @@ logger = logging.getLogger(__name__)
 
 class GeminiClient:
     """
-    Стабильный клиент Gemini.
+    Стабильный клиент.
 
-    Что важно:
-    - Для image modes НЕ ходит в Gemini вообще.
-    - Для avatar/poster/stickers/product всегда сразу использует локальный fallback.
-    - В Gemini ходит только для текстовых задач:
-      improve_prompt, classify_request, generate_helper_reply.
+    Для image modes:
+    - НЕ ходит в Gemini
+    - строит локальные сильные hidden prompts на английском,
+      чтобы image editing модели реально меняли фото
+
+    Для текстовых задач:
+    - improve_prompt
+    - classify_request
+    - generate_helper_reply
     """
 
     IMAGE_MODES = {"avatar", "poster", "stickers", "product"}
@@ -120,20 +124,20 @@ short_version, detailed_version, trend_version, detected_goal
             base = text.strip()
             return {
                 "short_version": base,
-                "detailed_version": f"{base}. Высокая детализация, чистая композиция, аккуратный свет, качественная обработка.",
-                "trend_version": f"{base}. Современный трендовый стиль, выразительный кадр, премиальная визуальная подача.",
+                "detailed_version": f"{base}. High detail, clean composition, premium lighting, polished image quality.",
+                "trend_version": f"{base}. Trendy social-media aesthetic, dramatic composition, premium edit, strong visual impact.",
                 "detected_goal": "general",
             }
 
     async def classify_request(self, text: str) -> str:
         prompt = f"""
-Классифицируй запрос пользователя строго в один из вариантов:
+Classify the user request into exactly one label:
 remove_bg, avatar, poster, stickers, product, help
 
-Запрос:
+User request:
 {text}
 
-Верни только одно слово из списка.
+Return only one label.
 """.strip()
 
         try:
@@ -157,50 +161,129 @@ remove_bg, avatar, poster, stickers, product, help
             return "product"
         return "help"
 
+    def _avatar_style_prompt(self, style_key: str | None) -> str:
+        styles = {
+            "old_money": (
+                "Transform the person into a refined old money portrait. "
+                "luxury styling, expensive coat, elegant grooming, aristocratic mood, "
+                "soft natural editorial light, premium magazine portrait, wealthy aesthetic"
+            ),
+            "cyberpunk": (
+                "Transform the person into a cyberpunk character portrait. "
+                "futuristic fashion, neon lighting, moody shadows, sci-fi city glow, "
+                "cinematic contrast, strong cyberpunk atmosphere"
+            ),
+            "anime": (
+                "Transform the person into a high-quality anime-inspired avatar. "
+                "anime facial styling, polished cel-shaded look, expressive eyes, "
+                "stylized but recognizable identity"
+            ),
+            "fashion": (
+                "Transform the person into a fashion editorial portrait. "
+                "editorial styling, magazine quality, premium retouch, controlled studio light, "
+                "high-end fashion campaign aesthetic"
+            ),
+            "luxury": (
+                "Transform the person into a luxury premium portrait. "
+                "expensive styling, beauty retouch, cinematic lighting, premium skin rendering, "
+                "high-status aesthetic"
+            ),
+        }
+        return styles.get(
+            style_key or "",
+            "Transform the person into a polished premium avatar portrait with strong stylistic enhancement."
+        )
+
+    def _poster_style_prompt(self, style_key: str | None) -> str:
+        styles = {
+            "cinematic": "Create a cinematic movie-poster-style transformation with dramatic lighting and bold composition.",
+            "action": "Create an action poster transformation with explosive energy, dramatic atmosphere, bold cinematic mood.",
+            "dark": "Create a dark dramatic poster transformation with moody lighting, tension, and strong contrast.",
+            "brand": "Create a premium brand-campaign poster transformation with advertising polish and strong visual identity.",
+            "youtube": "Create a bold, high-impact thumbnail/poster transformation with expressive styling and strong contrast.",
+        }
+        return styles.get(
+            style_key or "",
+            "Create a dramatic poster-style transformation with strong cinematic visual impact."
+        )
+
+    def _stickers_style_prompt(self, style_key: str | None) -> str:
+        styles = {
+            "meme": "Turn the person into a meme-style sticker character with exaggerated expression and humorous energy.",
+            "cute": "Turn the person into a cute sticker character with soft rounded shapes and charming expression.",
+            "anime": "Turn the person into an anime sticker character with expressive eyes and clean stylized outlines.",
+            "cartoon": "Turn the person into a cartoon sticker character with bold shapes and playful illustration style.",
+        }
+        return styles.get(
+            style_key or "",
+            "Turn the person into a sticker-style character with bold outlines and expressive emotion."
+        )
+
+    def _product_style_prompt(self, style_key: str | None) -> str:
+        styles = {
+            "luxury": "Transform the product image into a luxury commercial advertisement with premium styling and reflections.",
+            "minimal": "Transform the product image into a minimalist premium studio shot with clean modern composition.",
+            "marketplace": "Transform the product image into a polished marketplace-ready product shot with clean clarity.",
+            "ad": "Transform the product image into a premium advertising creative with commercial polish and visual hierarchy.",
+        }
+        return styles.get(
+            style_key or "",
+            "Transform the product image into a premium commercial studio-style product shot."
+        )
+
     def _build_local_image_prompt(
         self,
         mode: str,
         user_text: str = "",
         style_key: str | None = None,
     ) -> str:
-        """
-        Локальный builder для image modes.
-        Здесь нет внешних API-вызовов вообще.
-        """
-        style_part = f" Стиль: {style_key}." if style_key else ""
-        user_part = f" Пожелание пользователя: {user_text}." if user_text else ""
+        user_part = f" Extra user preference: {user_text}." if user_text else ""
 
         if mode == "avatar":
             return (
-                f"Сделай стильный портрет по загруженному фото.{style_part}{user_part} "
-                f"Естественная ретушь, акцент на лице, красивый свет, аккуратная детализация кожи, "
-                f"современная премиальная визуальная подача, выразительный взгляд, чистая композиция."
+                f"{self._avatar_style_prompt(style_key)} "
+                "This must be a strong visual transformation, not a minor correction. "
+                "Keep the person recognizable, but clearly restyle the image. "
+                "Improve clothing, lighting, color grading, facial presentation, and overall mood. "
+                "Do not return an almost unchanged photo. "
+                "Make it look like a finished premium AI avatar result. "
+                "High detail, premium edit, realistic face, polished composition."
+                f"{user_part}"
             )
 
         if mode == "poster":
             return (
-                f"Сделай кинематографичный постер по загруженному фото.{style_part}{user_part} "
-                f"Драматичный свет, сильная композиция, постерная подача, выразительная атмосфера, "
-                f"глубина, контраст, эффектный визуальный стиль, рекламный уровень качества."
+                f"{self._poster_style_prompt(style_key)} "
+                "This must be a strong poster-style transformation, not a subtle edit. "
+                "Preserve the subject identity, but dramatically change the visual presentation. "
+                "Use cinematic lighting, poster composition, stylized mood, premium finish. "
+                "Do not keep the image close to the original casual photo."
+                f"{user_part}"
             )
 
         if mode == "stickers":
             return (
-                f"Сделай набор стикеров по загруженному фото.{style_part}{user_part} "
-                f"Чистые контуры, выразительные эмоции, яркая стикерная стилизация, "
-                f"читаемый персонаж, аккуратная изоляция, простой фон или прозрачная подача."
+                f"{self._stickers_style_prompt(style_key)} "
+                "This must be a strong transformation into sticker-like artwork. "
+                "Do not keep the original realistic casual photo look. "
+                "Use bold outlines, expressive emotion, clean subject separation, highly stylized result."
+                f"{user_part}"
             )
 
         if mode == "product":
             return (
-                f"Сделай коммерческое товарное фото по загруженному изображению.{style_part}{user_part} "
-                f"Студийный свет, чистая композиция, premium look, рекламная подача, "
-                f"аккуратные материалы, подчёркнутый объём, чистый фон, продающий визуал."
+                f"{self._product_style_prompt(style_key)} "
+                "This must be a strong commercial product-photo transformation. "
+                "Do not keep the original raw snapshot look. "
+                "Use advertising polish, premium studio light, clean composition, refined materials, sales-ready quality."
+                f"{user_part}"
             )
 
         return (
-            f"Обработай изображение по фото.{style_part}{user_part} "
-            f"Качественный результат, чистая композиция, аккуратная визуальная подача."
+            "Apply a strong visual transformation to the image. "
+            "Do not return an almost unchanged result. "
+            "Create a polished premium final image."
+            f"{user_part}"
         )
 
     async def build_hidden_image_prompt(
@@ -209,17 +292,6 @@ remove_bg, avatar, poster, stickers, product, help
         user_text: str = "",
         style_key: str | None = None,
     ) -> str:
-        """
-        Для image modes Gemini не используется вообще.
-        Сразу возвращается локально собранный hidden prompt.
-        """
-        if mode in self.IMAGE_MODES:
-            return self._build_local_image_prompt(
-                mode=mode,
-                user_text=user_text,
-                style_key=style_key,
-            )
-
         return self._build_local_image_prompt(
             mode=mode,
             user_text=user_text,
@@ -242,10 +314,10 @@ remove_bg, avatar, poster, stickers, product, help
         except Exception as exc:
             logger.warning("Gemini generate_helper_reply fallback: %s", exc)
             fallback = {
-                "avatar": "Пришли фото и коротко напиши, какой стиль нужен для аватара.",
-                "poster": "Пришли фото и напиши идею постера одним сообщением.",
-                "stickers": "Пришли фото и опиши настроение для стикеров: мемно, мило, аниме или что-то своё.",
-                "product": "Пришли фото товара и коротко опиши, какой нужен рекламный стиль.",
+                "avatar": "Пришли фото и выбери стиль для аватара.",
+                "poster": "Пришли фото и выбери стиль постера.",
+                "stickers": "Пришли фото и выбери стиль стикеров.",
+                "product": "Пришли фото товара и выбери стиль оформления.",
                 "remove_bg": "Пришли фото, и я уберу фон.",
                 "help": "Я умею убрать фон, сделать аватар, постер, стикеры и оформить товарное фото. Выбери режим и пришли фото.",
             }
