@@ -13,6 +13,7 @@ from app.keyboards.main_menu import (
     build_main_menu_keyboard,
     mode_title,
     photo_request_keyboard,
+    style_keyboard,
 )
 from app.services.history_service import HistoryService
 from app.services.image_workflow_service import ImageWorkflowService
@@ -62,15 +63,18 @@ async def open_mode(
     state: FSMContext,
     mode: str,
     text: str,
+    ask_style: bool,
 ) -> None:
     await state.clear()
     await state.set_state(BotStates.waiting_for_photo)
     await state.update_data(mode=mode, user_text="", style_key="")
 
+    markup = style_keyboard(mode) if ask_style else photo_request_keyboard()
+
     await safe_edit(
         callback,
         text=text,
-        reply_markup=photo_request_keyboard(),
+        reply_markup=markup,
     )
 
 
@@ -91,6 +95,7 @@ async def remove_bg_menu(callback: CallbackQuery, state: FSMContext) -> None:
         state,
         mode="remove_bg",
         text="Режим «Удалить фон» включён.\n\nПришли фото, и я верну PNG без фона.",
+        ask_style=False,
     )
 
 
@@ -100,7 +105,8 @@ async def avatar_menu(callback: CallbackQuery, state: FSMContext) -> None:
         callback,
         state,
         mode="avatar",
-        text="Режим «Аватар» включён.\n\nПришли фото. Потом можешь отдельно написать стиль: old money, cyberpunk, anime и т.д.",
+        text="Режим «Аватар» включён.\n\nСначала выбери стиль ниже, потом пришли фото.",
+        ask_style=True,
     )
 
 
@@ -110,7 +116,8 @@ async def poster_menu(callback: CallbackQuery, state: FSMContext) -> None:
         callback,
         state,
         mode="poster",
-        text="Режим «Постер» включён.\n\nПришли фото. Потом можешь отдельно написать идею постера.",
+        text="Режим «Постер» включён.\n\nСначала выбери стиль ниже, потом пришли фото.",
+        ask_style=True,
     )
 
 
@@ -120,7 +127,8 @@ async def stickers_menu(callback: CallbackQuery, state: FSMContext) -> None:
         callback,
         state,
         mode="stickers",
-        text="Режим «Стикеры» включён.\n\nПришли фото. Потом можешь отдельно написать настроение: мемно, мило, аниме и т.д.",
+        text="Режим «Стикеры» включён.\n\nСначала выбери стиль ниже, потом пришли фото.",
+        ask_style=True,
     )
 
 
@@ -130,7 +138,38 @@ async def product_menu(callback: CallbackQuery, state: FSMContext) -> None:
         callback,
         state,
         mode="product",
-        text="Режим «Оформить товар» включён.\n\nПришли фото товара. Потом можешь отдельно написать стиль оформления.",
+        text="Режим «Оформить товар» включён.\n\nСначала выбери стиль ниже, потом пришли фото.",
+        ask_style=True,
+    )
+
+
+@router.callback_query(F.data.startswith("style:"))
+async def style_selected(callback: CallbackQuery, state: FSMContext) -> None:
+    if not callback.data:
+        await callback.answer()
+        return
+
+    _, mode, style_key = callback.data.split(":", 2)
+
+    current = await state.get_data()
+    current_mode = current.get("mode")
+
+    if current_mode != mode:
+        await state.set_state(BotStates.waiting_for_photo)
+        await state.update_data(mode=mode, user_text="", style_key="")
+
+    final_style = "" if style_key == "skip" else style_key
+    await state.update_data(style_key=final_style)
+
+    style_text = "без выбранного стиля" if not final_style else f"стиль: {final_style}"
+    await safe_edit(
+        callback,
+        text=(
+            f"Режим «{mode_title(mode)}» включён.\n\n"
+            f"Выбран {style_text}.\n"
+            f"Теперь пришли фото."
+        ),
+        reply_markup=photo_request_keyboard(),
     )
 
 
@@ -151,10 +190,18 @@ async def handle_photo_in_selected_mode(message: Message, state: FSMContext) -> 
 
     async with AsyncSessionLocal() as session:
         user = await user_service.get_or_create_user(session, message.from_user)
+        task_type = {
+            "remove_bg": TaskTypes.REMOVE_BG,
+            "avatar": TaskTypes.AVATAR,
+            "poster": TaskTypes.POSTER,
+            "stickers": TaskTypes.STICKERS,
+            "product": TaskTypes.PRODUCT,
+        }.get(mode, mode)
+
         task = await crud.create_task(
             session,
             user_id=user.id,
-            task_type=TaskTypes.REMOVE_BG if mode == "remove_bg" else mode,
+            task_type=task_type,
             input_text=user_text or None,
             input_file_path=input_path,
             status=TaskStatuses.PROCESSING,
@@ -196,24 +243,24 @@ async def handle_photo_in_selected_mode(message: Message, state: FSMContext) -> 
             )
 
         except Exception as exc:  # noqa: BLE001
-    await crud.update_task_status(
-        session,
-        task.id,
-        status=TaskStatuses.FAILED,
-        error_message=str(exc),
-    )
+            await crud.update_task_status(
+                session,
+                task.id,
+                status=TaskStatuses.FAILED,
+                error_message=str(exc),
+            )
 
-    try:
-        await status_message.delete()
-    except Exception:
-        pass
+            try:
+                await status_message.delete()
+            except Exception:
+                pass
 
-    await message.answer(
-        f"Не удалось выполнить режим «{mode_title(mode)}».\n\n{exc}",
-        reply_markup=build_main_menu_keyboard(),
-    )
-    await state.clear()
-    return
+            await message.answer(
+                f"Не удалось выполнить режим «{mode_title(mode)}».\n\n{exc}",
+                reply_markup=build_main_menu_keyboard(),
+            )
+            await state.clear()
+            return
 
     file_bytes = Path(output_path).read_bytes()
     tg_file = BufferedInputFile(file=file_bytes, filename=Path(output_path).name)
@@ -223,7 +270,10 @@ async def handle_photo_in_selected_mode(message: Message, state: FSMContext) -> 
         caption=f"Готово. Режим: «{mode_title(mode)}».",
     )
 
-    await status_message.delete()
+    try:
+        await status_message.delete()
+    except Exception:
+        pass
 
     await message.answer(
         "Что делаем дальше?",
