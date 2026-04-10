@@ -1,97 +1,81 @@
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery
 
 from app.database.session import AsyncSessionLocal
 from app.handlers.states import BotStates
-from app.keyboards.templates_menu import (
-    build_template_categories_keyboard,
-    build_templates_keyboard,
-)
-from app.services.template_service import TemplateService
+from app.keyboards.main_menu import main_menu_keyboard, mode_title, photo_request_keyboard, style_keyboard
+from app.services.history_service import HistoryService
+from app.services.user_service import UserService
+from app.utils.constants import HistoryActions, MODE_TITLES, STYLE_PRESETS
 
 router = Router()
-template_service = TemplateService()
+user_service = UserService()
+history_service = HistoryService()
 
 
-async def safe_edit_text(
-    callback: CallbackQuery,
-    text: str,
-    reply_markup=None,
-) -> None:
-    try:
-        await callback.message.edit_text(
-            text=text,
-            reply_markup=reply_markup,
+async def _store_selected_mode(callback: CallbackQuery, mode: str, style_key: str | None) -> None:
+    async with AsyncSessionLocal() as session:
+        user = await user_service.get_or_create_user(session, callback.from_user)
+        await history_service.log(
+            session,
+            user_id=user.id,
+            action_type=HistoryActions.MODE_SELECTED,
+            payload_json={'mode': mode, 'style_key': style_key},
         )
-    except TelegramBadRequest as exc:
-        error_text = str(exc).lower()
-        if "message is not modified" in error_text:
-            await callback.answer("Уже открыто")
-            return
-        raise
+
+
+@router.callback_query(F.data == 'menu:home')
+async def menu_home(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.message.edit_text(
+        'Выбери, что сделать с фото:',
+        reply_markup=main_menu_keyboard(),
+    )
     await callback.answer()
 
 
-@router.message(F.text == "Трендовые шаблоны")
-async def templates_entrypoint(message: Message, state: FSMContext) -> None:
-    await state.clear()
-
-    async with AsyncSessionLocal() as session:
-        categories = await template_service.list_categories(session)
-
-    if not categories:
-        await message.answer("Шаблоны пока не загружены.")
+@router.callback_query(F.data.startswith('menu:'))
+async def menu_mode_selected(callback: CallbackQuery, state: FSMContext) -> None:
+    mode = callback.data.split(':', 1)[1]
+    if mode == 'home' or mode in {'history', 'help'}:
         return
 
-    await message.answer(
-        "Выбери категорию шаблонов:",
-        reply_markup=build_template_categories_keyboard(categories),
-    )
-
-
-@router.callback_query(F.data.startswith("tplcat:"))
-async def template_category_selected(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
 
-    if not callback.data:
-        await callback.answer()
-        return
-
-    category = callback.data.split(":", 1)[1]
-
-    async with AsyncSessionLocal() as session:
-        templates = await template_service.list_by_category(session, category)
-
-    if not templates:
-        await safe_edit_text(
-            callback,
-            "В этой категории пока нет шаблонов.",
-            reply_markup=None,
+    if mode == 'remove_bg':
+        await state.set_state(BotStates.waiting_for_photo)
+        await state.update_data(mode=mode, style_key=None)
+        await _store_selected_mode(callback, mode, None)
+        await callback.message.edit_text(
+            'Пришли фото. Я удалю фон и верну готовый PNG.',
+            reply_markup=photo_request_keyboard(mode),
         )
-        return
-
-    await safe_edit_text(
-        callback,
-        f"Категория: {category}\n\nВыбери шаблон:",
-        reply_markup=build_templates_keyboard(templates),
-    )
-
-
-@router.callback_query(F.data.startswith("tpl:"))
-async def template_selected(callback: CallbackQuery, state: FSMContext) -> None:
-    if not callback.data:
         await callback.answer()
         return
 
-    template_key = callback.data.split(":", 1)[1]
+    styles = STYLE_PRESETS.get(mode, [])
+    if not styles:
+        await callback.answer('Этот режим пока недоступен', show_alert=True)
+        return
 
-    await state.set_state(BotStates.waiting_for_template_input)
-    await state.update_data(template_key=template_key)
-
-    await safe_edit_text(
-        callback,
-        "Шаблон выбран.\n\nТеперь пришли текст или фото, и я соберу финальный prompt.",
-        reply_markup=None,
+    await callback.message.edit_text(
+        f'Режим: {MODE_TITLES.get(mode, mode)}\n\nВыбери стиль:',
+        reply_markup=style_keyboard(mode, styles),
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('style:'))
+async def style_selected(callback: CallbackQuery, state: FSMContext) -> None:
+    _, mode, style_key = callback.data.split(':', 2)
+    await state.set_state(BotStates.waiting_for_photo)
+    await state.update_data(mode=mode, style_key=style_key)
+    await _store_selected_mode(callback, mode, style_key)
+
+    await callback.message.edit_text(
+        f'Режим: {mode_title(mode)}\nСтиль: {style_key}\n\nТеперь пришли фото.\n'
+        'Если хочешь, добавь подпись к фото с пожеланиями.',
+        reply_markup=photo_request_keyboard(mode, style_key),
+    )
+    await callback.answer()

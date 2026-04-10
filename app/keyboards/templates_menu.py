@@ -1,32 +1,18 @@
-from collections.abc import Sequence
-
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from app.database.models import PromptTemplate
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def build_template_categories_keyboard(categories: Sequence[str]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-
-    for category in categories:
-        builder.button(
-            text=category.replace("_", " ").title(),
-            callback_data=f"tplcat:{category}",
-        )
-
-    builder.adjust(2)
-    return builder.as_markup()
+def build_categories_keyboard(categories: list[str]) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=category.title(), callback_data=f'tplcat:{category}')]
+        for category in categories
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_templates_keyboard(templates: Sequence[PromptTemplate]) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-
-    for template in templates:
-        builder.button(
-            text=template.title,
-            callback_data=f"tpl:{template.key}",
-        )
-
-    builder.adjust(1)
-    return builder.as_markup()
+def build_templates_keyboard(items: list[tuple[str, str]]) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=title, callback_data=f'tpl:{key}')]
+        for key, title in items
+    ]
+    rows.append([InlineKeyboardButton(text='← Категории', callback_data='tpl:back_to_categories')])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

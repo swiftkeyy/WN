@@ -4,15 +4,13 @@ import logging
 from aiogram.exceptions import TelegramUnauthorizedError
 
 from app.bot import create_bot, create_dispatcher, delete_webhook, set_bot_commands
-from app.config import get_settings
 from app.database.session import AsyncSessionLocal
 from app.services.template_service import TemplateService
 from app.utils.files import ensure_media_dirs
 from app.utils.logging import setup_logging
 
-settings = get_settings()
-template_service = TemplateService()
 logger = logging.getLogger(__name__)
+template_service = TemplateService()
 
 
 async def main() -> None:
@@ -27,24 +25,19 @@ async def main() -> None:
 
     try:
         try:
+            await delete_webhook(bot)
             await set_bot_commands(bot)
         except TelegramUnauthorizedError:
-            logger.error("Invalid TELEGRAM_BOT_TOKEN")
+            logger.error('Неверный TELEGRAM_BOT_TOKEN')
             return
-        except Exception as exc:
-            logger.warning("set_my_commands skipped: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning('Пропускаю часть Telegram init: %s', exc)
 
-        try:
-            await delete_webhook(bot)
-        except Exception as exc:
-            logger.warning("delete_webhook skipped: %s", exc)
-
-        logger.info("Bot started in polling mode")
+        logger.info('Бот запущен в режиме polling')
         await dp.start_polling(bot, skip_updates=True)
-
     finally:
         await bot.session.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())

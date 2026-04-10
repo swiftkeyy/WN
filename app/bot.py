@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+
 def create_bot() -> Bot:
-    """Create configured Telegram Bot instance."""
     return Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -28,17 +28,17 @@ def create_bot() -> Bot:
 
 
 async def set_bot_commands(bot: Bot) -> None:
-    """Register bot commands in Telegram."""
     await bot.set_my_commands(
         [
-            BotCommand(command='start', description='Запуск бота'),
-            BotCommand(command='help', description='Помощь и сценарии'),
+            BotCommand(command='start', description='Открыть меню'),
+            BotCommand(command='menu', description='Показать меню'),
+            BotCommand(command='help', description='Помощь'),
         ]
     )
 
 
+
 def create_dispatcher() -> Dispatcher:
-    """Create aiogram dispatcher and register routers."""
     dp = Dispatcher()
     dp.include_router(start_router)
     dp.include_router(help_router)
@@ -50,7 +50,6 @@ def create_dispatcher() -> Dispatcher:
 
 
 async def setup_webhook(bot: Bot) -> None:
-    """Configure Telegram webhook if webhook mode is enabled."""
     await bot.set_webhook(
         url=settings.webhook_full_url,
         secret_token=settings.telegram_webhook_secret,
@@ -60,5 +59,4 @@ async def setup_webhook(bot: Bot) -> None:
 
 
 async def delete_webhook(bot: Bot) -> None:
-    """Delete Telegram webhook for polling mode."""
     await bot.delete_webhook(drop_pending_updates=True)

@@ -6,12 +6,13 @@ import logging
 import httpx
 
 from app.config import get_settings
+from app.utils.constants import MODE_TITLES
 
 logger = logging.getLogger(__name__)
 
 
 class GeminiClient:
-    """Async Gemini REST client with safe fallbacks."""
+    """Gemini-клиент для внутренней логики бота."""
 
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -48,125 +49,56 @@ class GeminiClient:
             raise RuntimeError('Gemini response contained no text')
         return text
 
-    async def improve_prompt(self, text: str) -> dict[str, str]:
-        """Improve a raw prompt and return multiple production-ready variants."""
+    async def build_hidden_image_prompt(self, mode: str, style_key: str | None, user_text: str) -> str:
         prompt = f"""
-You are a prompt optimization assistant for AI image workflows.
-Return strict JSON with keys: short_version, detailed_version, trend_version, detected_goal.
-User prompt: {text}
-Constraints:
-- short_version: one strong concise image prompt.
-- detailed_version: expanded production-ready prompt.
-- trend_version: social-media-friendly trendy visual variant.
-- detected_goal: one short label.
-Output only JSON.
-""".strip()
-        try:
-            raw = await self._generate_text(prompt, response_mime_type='application/json')
-            parsed = json.loads(raw)
-            return {
-                'short_version': parsed.get('short_version', text.strip()),
-                'detailed_version': parsed.get('detailed_version', text.strip()),
-                'trend_version': parsed.get('trend_version', text.strip()),
-                'detected_goal': parsed.get('detected_goal', 'general'),
-            }
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Gemini improve_prompt failed: %s', exc)
-            base = text.strip()
-            return {
-                'short_version': base,
-                'detailed_version': f'{base}. High detail, clean composition, cinematic lighting, premium quality.',
-                'trend_version': f'{base}. Viral social media aesthetic, punchy composition, polished editing, premium visual impact.',
-                'detected_goal': 'general',
-            }
+Ты — внутренний AI-оркестратор Telegram-бота по обработке фото.
+Твоя задача: создать скрытый production-ready prompt для image-to-image workflow.
+Пользователь этот prompt не увидит.
 
-    async def classify_request(self, text: str) -> str:
-        """Classify user intent into a supported bot action."""
-        prompt = f"""
-Classify the user request into exactly one label from this list:
-remove_bg, prompt_improve, template_apply, ai_caption, poster_idea, avatar_makeover, product_photo, sticker_pack, general_help.
-User request: {text}
-Output only the label.
-""".strip()
-        try:
-            label = (await self._generate_text(prompt)).strip().lower()
-            allowed = {
-                'remove_bg',
-                'prompt_improve',
-                'template_apply',
-                'ai_caption',
-                'poster_idea',
-                'avatar_makeover',
-                'product_photo',
-                'sticker_pack',
-                'general_help',
-            }
-            if label in allowed:
-                return label
-        except Exception as exc:  # noqa: BLE001
-            logger.exception('Gemini classify_request failed: %s', exc)
+Режим: {mode}
+Название режима: {MODE_TITLES.get(mode, mode)}
+Стиль: {style_key or 'не указан'}
+Пожелания пользователя: {user_text or 'без доп. пожеланий'}
 
-        lowered = text.lower()
-        if 'фон' in lowered or 'background' in lowered:
-            return 'remove_bg'
-        if 'стикер' in lowered or 'sticker' in lowered:
-            return 'sticker_pack'
-        if 'аватар' in lowered or 'avatar' in lowered:
-            return 'avatar_makeover'
-        if 'product' in lowered or 'товар' in lowered:
-            return 'product_photo'
-        if 'poster' in lowered or 'постер' in lowered:
-            return 'poster_idea'
-        if 'caption' in lowered or 'подпись' in lowered or 'идея' in lowered:
-            return 'ai_caption'
-        return 'prompt_improve'
-
-    async def build_template_prompt(
-        self,
-        template_key: str,
-        user_input: str,
-        base_template: str | None = None,
-    ) -> str:
-        """Build a final prompt for a selected template."""
-        prompt = f"""
-You are building a final AI image prompt.
-Template key: {template_key}
-Base template: {base_template or 'Use best practices'}
-User input: {user_input}
-Return only the final prompt text.
-Rules:
-- Keep it actionable for image generation tools.
-- Preserve the template intent.
-- Add style, lighting, composition, and detail cues when useful.
-- Do not explain.
+Верни только один готовый prompt на английском языке.
+Он должен быть пригоден для image editing / restyle workflow.
+Без пояснений.
 """.strip()
         try:
             return await self._generate_text(prompt)
         except Exception as exc:  # noqa: BLE001
-            logger.exception('Gemini build_template_prompt failed: %s', exc)
-            seed = base_template or 'Create a high-quality visual based on the user request.'
-            return f'{seed} User-specific details: {user_input}. Output should look polished, premium, and ready for modern AI image workflows.'
+            logger.exception('Gemini build_hidden_image_prompt failed: %s', exc)
+            return (
+                f'{MODE_TITLES.get(mode, mode)} based on uploaded photo. '
+                f'Style: {style_key or "default"}. '
+                f'User wishes: {user_text or "none"}. '
+                'High detail, premium quality, realistic lighting, clean composition.'
+            )
 
-    async def generate_helper_reply(self, mode: str, text: str) -> str:
-        """Generate a short user-facing helper message for non-image tasks."""
-        prompt = f"""
-You are an AI assistant inside a Telegram bot for image creators.
-Mode: {mode}
-User input: {text}
-Return a concise but useful answer in Russian.
-If relevant, include one final ready-to-copy prompt block in plain text.
-Do not use markdown headings.
+    async def generate_help_text(self) -> str:
+        prompt = """
+Составь короткую справку на русском языке для Telegram-бота, который сам обрабатывает фотографии.
+Режимы: удалить фон, аватар, постер, стикеры, товарное фото.
+Тон: короткий, понятный, дружелюбный.
+Не используй markdown-заголовки.
 """.strip()
         try:
             return await self._generate_text(prompt)
         except Exception as exc:  # noqa: BLE001
-            logger.exception('Gemini generate_helper_reply failed: %s', exc)
-            fallback = {
-                'ai_caption': f'Идея для визуала: {text}\n\nГотовый промпт: Create a clean social media visual based on: {text}. Modern composition, strong focal point, polished details.',
-                'poster_idea': f'Готовый постер-промпт: Cinematic poster concept based on {text}. Dramatic lighting, bold typography area, premium composition.',
-                'avatar_makeover': f'Готовый аватар-промпт: Stylish portrait makeover based on {text}. Sharp face detail, premium lighting, modern editorial finish.',
-                'product_photo': f'Готовый product-промпт: Premium product shot based on {text}. Soft studio light, sharp materials, luxury ad composition.',
-                'sticker_pack': f'Готовый sticker-промпт: Sticker pack concept based on {text}. Consistent character style, clean outlines, transparent background.',
-                'general_help': 'Я умею удалить фон, улучшить промпт, применить шаблон и собрать идею для визуала. Нажми кнопку в меню или просто напиши задачу.',
-            }
-            return fallback.get(mode, fallback['general_help'])
+            logger.exception('Gemini generate_help_text failed: %s', exc)
+            return (
+                'Я сам обрабатываю фото и возвращаю готовый результат.\n\n'
+                'Доступные режимы:\n'
+                '• Удалить фон\n'
+                '• Сделать аватар\n'
+                '• Сделать постер\n'
+                '• Сделать стикеры\n'
+                '• Оформить товарное фото\n\n'
+                'Выбери режим кнопками, затем пришли фото. При желании можно добавить подпись с пожеланиями.'
+            )
+
+    async def summarize_history_title(self, mode: str, style_key: str | None) -> str:
+        title = MODE_TITLES.get(mode, mode)
+        if style_key:
+            return f'{title} / {style_key}'
+        return title

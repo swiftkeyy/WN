@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     max_history_items: int = 10
     template_seed_path: Path = Path('./app/prompt_templates/trend_templates.json')
+    image_provider: str = 'none'
 
     @property
     def webhook_path(self) -> str:
