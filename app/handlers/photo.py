@@ -196,18 +196,24 @@ async def handle_photo_in_selected_mode(message: Message, state: FSMContext) -> 
             )
 
         except Exception as exc:  # noqa: BLE001
-            await crud.update_task_status(
-                session,
-                task.id,
-                status=TaskStatuses.FAILED,
-                error_message=str(exc),
-            )
-            await status_message.edit_text(
-                f"Не удалось выполнить режим «{mode_title(mode)}».\n\n{exc}",
-                reply_markup=build_main_menu_keyboard(),
-            )
-            await state.clear()
-            return
+    await crud.update_task_status(
+        session,
+        task.id,
+        status=TaskStatuses.FAILED,
+        error_message=str(exc),
+    )
+
+    try:
+        await status_message.delete()
+    except Exception:
+        pass
+
+    await message.answer(
+        f"Не удалось выполнить режим «{mode_title(mode)}».\n\n{exc}",
+        reply_markup=build_main_menu_keyboard(),
+    )
+    await state.clear()
+    return
 
     file_bytes = Path(output_path).read_bytes()
     tg_file = BufferedInputFile(file=file_bytes, filename=Path(output_path).name)
