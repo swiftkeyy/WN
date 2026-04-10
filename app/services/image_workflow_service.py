@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.ai.gemini_client import GeminiClient
+from app.providers.base import ImageJobRequest
 from app.providers.factory import ImageProviderFactory
 
 
@@ -32,12 +33,22 @@ class ImageWorkflowService:
 
         provider = self.provider_factory.get_provider(mode=mode)
 
-        output_path = await provider.process_image(
+        job = ImageJobRequest(
             mode=mode,
             input_path=input_path,
             prompt=hidden_prompt,
             style_key=style_key,
         )
+
+        if hasattr(provider, "run"):
+            output_path = await provider.run(job)
+        else:
+            output_path = await provider.process_image(
+                mode=mode,
+                input_path=input_path,
+                prompt=hidden_prompt,
+                style_key=style_key,
+            )
 
         provider_name = getattr(provider, "provider_name", provider.__class__.__name__)
 
