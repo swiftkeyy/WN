@@ -1,24 +1,22 @@
+from __future__ import annotations
+
 from app.config import get_settings
-from app.providers.base import BaseImageProvider
 from app.providers.fal_provider import FalImageProvider
-from app.providers.mock import UnconfiguredImageProvider
 from app.providers.multi_provider import MultiImageProvider
-from app.providers.openai_provider import OpenAIImageProvider
 from app.providers.replicate_provider import ReplicateImageProvider
 
 
 class ImageProviderFactory:
-    @staticmethod
-    def create() -> BaseImageProvider:
-        settings = get_settings()
-        provider = settings.image_provider.strip().lower()
+    def __init__(self) -> None:
+        self.settings = get_settings()
 
-        if provider == 'openai':
-            return OpenAIImageProvider()
-        if provider == 'replicate':
+    def get_provider(self, mode: str):
+        provider_name = (getattr(self.settings, "image_provider", "multi") or "multi").lower()
+
+        if provider_name == "replicate":
             return ReplicateImageProvider()
-        if provider == 'fal':
+
+        if provider_name == "fal":
             return FalImageProvider()
-        if provider == 'multi':
-            return MultiImageProvider()
-        return UnconfiguredImageProvider()
+
+        return MultiImageProvider()
