@@ -13,5 +13,7 @@ class ImageJobRequest:
 
 
 class BaseImageProvider:
+    provider_name: str = 'base'
+
     async def process(self, job: ImageJobRequest) -> str:
         raise NotImplementedError

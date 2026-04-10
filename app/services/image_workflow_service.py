@@ -20,9 +20,9 @@ class ImageWorkflowService:
         input_path: str,
         user_text: str | None = None,
         style_key: str | None = None,
-    ) -> str:
+    ) -> tuple[str, str]:
         if mode == BotModes.REMOVE_BG:
-            return await self.remove_bg.remove_background(input_path)
+            return await self.remove_bg.remove_background(input_path), 'remove.bg'
 
         internal_prompt = await self.gemini.build_hidden_image_prompt(
             mode=mode,
@@ -36,4 +36,5 @@ class ImageWorkflowService:
             input_path=input_path,
             internal_prompt=internal_prompt,
         )
-        return await self.image_provider.process(job)
+        output_path = await self.image_provider.process(job)
+        return output_path, self.image_provider.provider_name
