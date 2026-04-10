@@ -22,23 +22,14 @@ class MultiImageProvider(BaseImageProvider):
 
         for provider in self._pick_chain(job.mode):
             try:
-                if hasattr(provider, "run"):
-                    return await provider.run(job)
-
-                return await provider.process_image(
-                    mode=job.mode,
-                    input_path=job.input_path,
-                    prompt=job.prompt,
-                    style_key=job.style_key,
-                )
+                return await provider.run(job)
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
-                continue
 
         if last_error is not None:
             raise last_error
 
-        raise RuntimeError("Не удалось выбрать provider для обработки изображения")
+        raise RuntimeError("Не удалось обработать изображение")
 
     async def process_image(
         self,
