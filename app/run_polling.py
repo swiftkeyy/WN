@@ -29,22 +29,18 @@ async def main() -> None:
         try:
             await set_bot_commands(bot)
         except TelegramUnauthorizedError:
-            logger.error("Invalid TELEGRAM_BOT_TOKEN: Telegram returned Unauthorized")
+            logger.error("Invalid TELEGRAM_BOT_TOKEN")
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("set_my_commands skipped: %s", exc)
 
-        if settings.telegram_mode == "polling":
-            try:
-                await delete_webhook(bot)
-            except TelegramUnauthorizedError:
-                logger.error("Invalid TELEGRAM_BOT_TOKEN: Telegram returned Unauthorized")
-                return
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("delete_webhook skipped: %s", exc)
+        try:
+            await delete_webhook(bot)
+        except Exception as exc:
+            logger.warning("delete_webhook skipped: %s", exc)
 
-        logger.info("Bot started in %s mode", settings.telegram_mode)
-        await dp.start_polling(bot)
+        logger.info("Bot started in polling mode")
+        await dp.start_polling(bot, skip_updates=True)
 
     finally:
         await bot.session.close()
