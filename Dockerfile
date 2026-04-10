@@ -13,4 +13,4 @@ COPY . .
 
 RUN mkdir -p /app/data/media/input /app/data/media/output /app/data/media/temp
 
-CMD ["bash", "-lc", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+CMD ["bash", "-lc", "mkdir -p data/media/input data/media/output data/media/temp && alembic upgrade head && python -m app.run_polling"]
