@@ -14,10 +14,8 @@ class FalImageProvider(BaseImageProvider):
     provider_name = "fal"
 
     def __init__(self) -> None:
-        self.model_ref = os.getenv(
-            "FAL_MODEL_REF",
-            "fal-ai/nano-banana/edit",
-        )
+        self.model_ref = os.getenv("FAL_MODEL_REF", "fal-ai/nano-banana/edit")
+        self.fal_key = os.getenv("FAL_KEY", "").strip()
 
     async def _download_output(self, url: str, output_path: Path) -> str:
         async with aiohttp.ClientSession() as session:
@@ -31,7 +29,13 @@ class FalImageProvider(BaseImageProvider):
         return str(output_path)
 
     async def run(self, job: ImageJobRequest) -> str:
+        if not self.fal_key:
+            raise RuntimeError("FAL_KEY не задан в переменных окружения")
+
         input_path = Path(job.input_path)
+        if not input_path.exists():
+            raise RuntimeError(f"Входной файл не найден: {job.input_path}")
+
         output_dir = Path("./data/media/output")
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / f"{input_path.stem}_fal.png"
@@ -48,11 +52,11 @@ class FalImageProvider(BaseImageProvider):
 
         images = result.get("images", [])
         if not images:
-            raise RuntimeError("fal не вернул images")
+            raise RuntimeError(f"fal не вернул images: {result}")
 
         image_url = images[0].get("url")
         if not image_url:
-            raise RuntimeError("fal не вернул URL результата")
+            raise RuntimeError(f"fal не вернул URL результата: {result}")
 
         return await self._download_output(image_url, output_path)
 
