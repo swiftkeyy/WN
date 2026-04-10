@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 
-@dataclass(slots=True)
-class ImageJobRequest:
-    mode: str
-    style_key: str | None
-    user_text: str | None
-    input_path: str
-    internal_prompt: str
+class BaseImageProvider(ABC):
+    provider_name: str = "base"
 
-
-class BaseImageProvider:
-    provider_name: str = 'base'
-
-    async def process(self, job: ImageJobRequest) -> str:
+    @abstractmethod
+    async def process_image(
+        self,
+        mode: str,
+        input_path: str,
+        prompt: str,
+        style_key: str | None = None,
+    ) -> str:
         raise NotImplementedError
