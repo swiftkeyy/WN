@@ -14,6 +14,14 @@ class TaskTypes:
     HELP = "help"
 
 
+class BotModes:
+    REMOVE_BG = "remove_bg"
+    AVATAR = "avatar"
+    POSTER = "poster"
+    STICKERS = "stickers"
+    PRODUCT = "product"
+
+
 class HistoryActions:
     START = "start"
     REMOVE_BG_REQUESTED = "remove_bg_requested"
