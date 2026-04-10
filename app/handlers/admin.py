@@ -19,31 +19,40 @@ admin_service = AdminService()
 
 
 def _admin_ids() -> set[int]:
-    raw = getattr(settings, "admin_telegram_ids", "") or ""
-    result = set()
+    raw = str(getattr(settings, "admin_telegram_ids", "") or "").strip()
 
+    result: set[int] = set()
     for part in raw.split(","):
-        part = part.strip()
-        if part.isdigit():
+        part = part.strip().replace(" ", "")
+        if not part:
+            continue
+        try:
             result.add(int(part))
-
+        except ValueError:
+            continue
     return result
 
 
 def is_admin(user_id: int | None) -> bool:
     if user_id is None:
         return False
-    return user_id in _admin_ids()
+    return int(user_id) in _admin_ids()
 
 
-def admin_denied_text() -> str:
-    return "У тебя нет доступа к админке."
+def admin_denied_text(user_id: int | None) -> str:
+    return (
+        "У тебя нет доступа к админке.\n\n"
+        f"Твой Telegram ID: {user_id}\n"
+        f"ADMIN_TELEGRAM_IDS: {getattr(settings, 'admin_telegram_ids', '')}"
+    )
 
 
 @router.message(Command("admin"))
 async def admin_entry(message: Message) -> None:
-    if not is_admin(message.from_user.id if message.from_user else None):
-        await message.answer(admin_denied_text())
+    user_id = message.from_user.id if message.from_user else None
+
+    if not is_admin(user_id):
+        await message.answer(admin_denied_text(user_id))
         return
 
     await message.answer(
@@ -54,7 +63,9 @@ async def admin_entry(message: Message) -> None:
 
 @router.callback_query(F.data == "admin:root")
 async def admin_root(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -67,7 +78,9 @@ async def admin_root(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:stats")
 async def admin_stats(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -92,7 +105,9 @@ async def admin_stats(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:users")
 async def admin_users(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -118,7 +133,9 @@ async def admin_users(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:tasks")
 async def admin_tasks(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -144,7 +161,9 @@ async def admin_tasks(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:errors")
 async def admin_errors(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -170,7 +189,9 @@ async def admin_errors(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:history")
 async def admin_history(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -182,9 +203,7 @@ async def admin_history(callback: CallbackQuery) -> None:
     else:
         lines = ["🕘 Последняя история:\n"]
         for item in items:
-            lines.append(
-                f"{item.id}. user={item.user_id} | {item.action_type}"
-            )
+            lines.append(f"{item.id}. user={item.user_id} | {item.action_type}")
         text = "\n".join(lines[:30])
 
     await callback.message.edit_text(
@@ -196,7 +215,9 @@ async def admin_history(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "admin:templates")
 async def admin_templates(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -212,7 +233,9 @@ async def admin_templates(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("admin_tpl:"))
 async def admin_template_view(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
@@ -242,7 +265,9 @@ async def admin_template_view(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("admin_tpl_toggle:"))
 async def admin_template_toggle(callback: CallbackQuery) -> None:
-    if not is_admin(callback.from_user.id if callback.from_user else None):
+    user_id = callback.from_user.id if callback.from_user else None
+
+    if not is_admin(user_id):
         await callback.answer("Нет доступа", show_alert=True)
         return
 
