@@ -12,6 +12,7 @@ from app.handlers.help import router as help_router
 from app.handlers.history import router as history_router
 from app.handlers.photo import router as photo_router
 from app.handlers.start import router as start_router
+from app.handlers.admin import router as admin_router
 from app.handlers.templates import router as templates_router
 from app.handlers.text import router as text_router
 
@@ -41,6 +42,7 @@ async def set_bot_commands(bot: Bot) -> None:
 def create_dispatcher() -> Dispatcher:
     dp = Dispatcher()
     dp.include_router(start_router)
+    dp.include_router(admin_router)
     dp.include_router(help_router)
     dp.include_router(history_router)
     dp.include_router(templates_router)
