@@ -37,6 +37,26 @@ async def create_user(
     return user
 
 
+async def update_user_profile(
+    session: AsyncSession,
+    user_id: int,
+    username: str | None = None,
+    first_name: str | None = None,
+    language_code: str | None = None,
+) -> User | None:
+    user = await session.get(User, user_id)
+    if user is None:
+        return None
+
+    user.username = username
+    user.first_name = first_name
+    user.language_code = language_code
+
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 async def create_task(
     session: AsyncSession,
     user_id: int,
