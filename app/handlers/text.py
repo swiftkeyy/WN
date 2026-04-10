@@ -10,32 +10,13 @@ router = Router()
 gemini_client = GeminiClient()
 
 
-STYLE_HINTS = {
-    "avatar": ["old money", "cyberpunk", "anime", "fashion", "luxury"],
-    "poster": ["cinematic", "action", "dark", "brand", "youtube"],
-    "stickers": ["мемно", "мило", "аниме", "мультяшно"],
-    "product": ["luxury", "minimal", "marketplace", "ad"],
-}
-
-
 @router.message(BotStates.waiting_for_photo, F.text & ~F.text.startswith("/"))
 async def save_user_text_for_mode(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
     data = await state.get_data()
     mode = data.get("mode", "avatar")
 
-    style_key = ""
-    lowered = text.lower()
-
-    for hint in STYLE_HINTS.get(mode, []):
-        if hint.lower() in lowered:
-            style_key = hint
-            break
-
-    await state.update_data(
-        user_text=text,
-        style_key=style_key,
-    )
+    await state.update_data(user_text=text)
 
     await message.answer(
         f"Пожелание для режима «{mode_title(mode)}» сохранено.\nТеперь пришли фото.",
