@@ -1,34 +1,40 @@
 from aiogram import F, Router
-from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
-from app.ai.gemini_client import GeminiClient
-from app.database.session import AsyncSessionLocal
-from app.keyboards.main_menu import history_keyboard, main_menu_keyboard
-from app.services.history_service import HistoryService
-from app.services.user_service import UserService
-from app.utils.constants import HistoryActions
+from app.keyboards.main_menu import build_main_menu_keyboard
 
 router = Router()
-user_service = UserService()
-history_service = HistoryService()
-gemini_client = GeminiClient()
 
 
-@router.message(Command('help'))
+HELP_TEXT = (
+    "Помощь по режимам:\n\n"
+    "🪄 Удалить фон — пришли фото, я уберу фон через remove.bg.\n"
+    "👤 Сделать аватар — пришли фото, я сделаю стилизованный аватар.\n"
+    "🎬 Сделать постер — пришли фото, я соберу постерный результат.\n"
+    "🎟 Сделать стикеры — пришли фото, я подготовлю стикерный вариант.\n"
+    "🛍 Оформить товар — пришли фото товара, я оформлю его как рекламный кадр.\n\n"
+    "После выбора режима просто отправь фото.\n"
+    "Если хочешь, можешь добавить короткое пожелание текстом."
+)
+
+
+@router.message(F.text == "/help")
 async def help_command(message: Message) -> None:
-    text = await gemini_client.generate_help_text()
-    async with AsyncSessionLocal() as session:
-        user = await user_service.get_or_create_user(session, message.from_user)
-        await history_service.log(session, user_id=user.id, action_type=HistoryActions.HELP, payload_json={'source': '/help'})
-    await message.answer(text, reply_markup=main_menu_keyboard())
+    await message.answer(
+        HELP_TEXT,
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await message.answer(
+        "Что делаем дальше?",
+        reply_markup=build_main_menu_keyboard(),
+    )
 
 
-@router.callback_query(F.data == 'menu:help')
+@router.callback_query(F.data == "menu:help")
 async def help_callback(callback: CallbackQuery) -> None:
-    text = await gemini_client.generate_help_text()
-    async with AsyncSessionLocal() as session:
-        user = await user_service.get_or_create_user(session, callback.from_user)
-        await history_service.log(session, user_id=user.id, action_type=HistoryActions.HELP, payload_json={'source': 'inline'})
-    await callback.message.edit_text(text, reply_markup=history_keyboard())
+    if callback.message:
+        await callback.message.edit_text(
+            HELP_TEXT,
+            reply_markup=build_main_menu_keyboard(),
+        )
     await callback.answer()
